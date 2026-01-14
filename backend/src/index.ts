@@ -13,11 +13,15 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+// CORS - Allow all origins in development for Chrome extension compatibility
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'chrome-extension://*'],
+    origin: true, // Allow all origins
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '10mb' })); // Large limit for resume uploads
+
 
 // Health check
 app.get('/health', (req, res) => {
