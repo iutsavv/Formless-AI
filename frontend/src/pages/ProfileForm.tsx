@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import { api, Profile } from '../api/client';
 import toast from 'react-hot-toast';
 import {
@@ -16,6 +16,7 @@ import {
     CheckCircle,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import { countries, getStatesByCountry, getCitiesByState } from '../data/locations';
 
 const initialProfile: Partial<Profile> = {
     firstName: '',
@@ -36,22 +37,53 @@ const initialProfile: Partial<Profile> = {
     willingToRelocate: false,
     salaryExpectation: '',
     availableStartDate: '',
+    // Education
     degree: '',
     university: '',
-    graduationYear: '',
-    gpa: '',
     fieldOfStudy: '',
+    gpa: '',
+    educationStartMonth: '',
+    educationStartYear: '',
+    educationEndMonth: '',
+    educationEndYear: '',
+    graduationYear: '',
+    // Work Experience
     yearsOfExperience: '',
+    jobTitle: '',
+    companyName: '',
+    workStartMonth: '',
+    workStartYear: '',
+    workEndMonth: '',
+    workEndYear: '',
+    isCurrentJob: false,
+    jobDescription: '',
+    // Skills & other
     skills: '',
+    softSkills: '',
+    languages: '',
+    certifications: '',
     summary: '',
     coverLetter: '',
 };
+
 
 export default function ProfileForm() {
     const [profile, setProfile] = useState<Partial<Profile>>(initialProfile);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+    // Memoized states based on selected country
+    const availableStates = useMemo(() => {
+        return profile.country ? getStatesByCountry(profile.country) : [];
+    }, [profile.country]);
+
+    // Memoized cities based on selected country and state
+    const availableCities = useMemo(() => {
+        return profile.country && profile.state
+            ? getCitiesByState(profile.country, profile.state)
+            : [];
+    }, [profile.country, profile.state]);
 
     useEffect(() => {
         loadProfile();
@@ -67,6 +99,25 @@ export default function ProfileForm() {
 
     const handleChange = (field: keyof Profile, value: string | boolean) => {
         setProfile((prev) => ({ ...prev, [field]: value }));
+    };
+
+    // Handler for country change - resets state and city
+    const handleCountryChange = (countryName: string) => {
+        setProfile((prev) => ({
+            ...prev,
+            country: countryName,
+            state: '',
+            city: ''
+        }));
+    };
+
+    // Handler for state change - resets city
+    const handleStateChange = (stateName: string) => {
+        setProfile((prev) => ({
+            ...prev,
+            state: stateName,
+            city: ''
+        }));
     };
 
     const handleSubmit = async (e: FormEvent) => {
@@ -183,24 +234,55 @@ export default function ProfileForm() {
                             </div>
                             <div className="grid grid-2">
                                 <div className="form-group">
-                                    <label className="form-label">City</label>
-                                    <input
-                                        type="text"
+                                    <label className="form-label">Country</label>
+                                    <select
                                         className="form-input"
-                                        placeholder="San Francisco"
-                                        value={profile.city || ''}
-                                        onChange={(e) => handleChange('city', e.target.value)}
-                                    />
+                                        value={profile.country || ''}
+                                        onChange={(e) => handleCountryChange(e.target.value)}
+                                    >
+                                        <option value="">Select country...</option>
+                                        {countries.map((country) => (
+                                            <option key={country.code} value={country.name}>
+                                                {country.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">State / Province</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         className="form-input"
-                                        placeholder="California"
                                         value={profile.state || ''}
-                                        onChange={(e) => handleChange('state', e.target.value)}
-                                    />
+                                        onChange={(e) => handleStateChange(e.target.value)}
+                                        disabled={!profile.country}
+                                    >
+                                        <option value="">
+                                            {profile.country ? 'Select state...' : 'Select country first'}
+                                        </option>
+                                        {availableStates.map((state) => (
+                                            <option key={state.code} value={state.name}>
+                                                {state.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">City</label>
+                                    <select
+                                        className="form-input"
+                                        value={profile.city || ''}
+                                        onChange={(e) => handleChange('city', e.target.value)}
+                                        disabled={!profile.state}
+                                    >
+                                        <option value="">
+                                            {profile.state ? 'Select city...' : 'Select state first'}
+                                        </option>
+                                        {availableCities.map((city) => (
+                                            <option key={city} value={city}>
+                                                {city}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">ZIP / Postal Code</label>
@@ -212,44 +294,34 @@ export default function ProfileForm() {
                                         onChange={(e) => handleChange('zipCode', e.target.value)}
                                     />
                                 </div>
-                                <div className="form-group">
-                                    <label className="form-label">Country</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="United States"
-                                        value={profile.country || ''}
-                                        onChange={(e) => handleChange('country', e.target.value)}
-                                    />
-                                </div>
                             </div>
                         </div>
 
-                        {/* Professional Information */}
+                        {/* Work Experience */}
                         <div className="card section animate-fade-in" style={{ animationDelay: '0.2s' }}>
                             <h3 className="section-title">
                                 <Briefcase size={20} className="section-icon" />
-                                Professional Information
+                                Work Experience
                             </h3>
                             <div className="grid grid-2">
                                 <div className="form-group">
-                                    <label className="form-label">Current Job Title</label>
+                                    <label className="form-label">Job Title</label>
                                     <input
                                         type="text"
                                         className="form-input"
                                         placeholder="Software Engineer"
-                                        value={profile.currentJobTitle || ''}
-                                        onChange={(e) => handleChange('currentJobTitle', e.target.value)}
+                                        value={profile.jobTitle || ''}
+                                        onChange={(e) => handleChange('jobTitle', e.target.value)}
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Current Company</label>
+                                    <label className="form-label">Company Name</label>
                                     <input
                                         type="text"
                                         className="form-input"
                                         placeholder="Google"
-                                        value={profile.currentCompany || ''}
-                                        onChange={(e) => handleChange('currentCompany', e.target.value)}
+                                        value={profile.companyName || ''}
+                                        onChange={(e) => handleChange('companyName', e.target.value)}
                                     />
                                 </div>
                                 <div className="form-group">
@@ -262,18 +334,98 @@ export default function ProfileForm() {
                                         onChange={(e) => handleChange('yearsOfExperience', e.target.value)}
                                     />
                                 </div>
+                            </div>
+                            <div className="grid grid-2" style={{ marginTop: '1rem' }}>
                                 <div className="form-group">
-                                    <label className="form-label">Skills (comma-separated)</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="JavaScript, React, Node.js, Python"
-                                        value={profile.skills || ''}
-                                        onChange={(e) => handleChange('skills', e.target.value)}
-                                    />
+                                    <label className="form-label">Start Date</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <select
+                                            className="form-input"
+                                            value={profile.workStartMonth || ''}
+                                            onChange={(e) => handleChange('workStartMonth', e.target.value)}
+                                            style={{ flex: 1 }}
+                                        >
+                                            <option value="">Month</option>
+                                            <option value="01">January</option>
+                                            <option value="02">February</option>
+                                            <option value="03">March</option>
+                                            <option value="04">April</option>
+                                            <option value="05">May</option>
+                                            <option value="06">June</option>
+                                            <option value="07">July</option>
+                                            <option value="08">August</option>
+                                            <option value="09">September</option>
+                                            <option value="10">October</option>
+                                            <option value="11">November</option>
+                                            <option value="12">December</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Year"
+                                            value={profile.workStartYear || ''}
+                                            onChange={(e) => handleChange('workStartYear', e.target.value)}
+                                            style={{ width: '100px' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">End Date</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <select
+                                            className="form-input"
+                                            value={profile.workEndMonth || ''}
+                                            onChange={(e) => handleChange('workEndMonth', e.target.value)}
+                                            style={{ flex: 1 }}
+                                            disabled={profile.isCurrentJob}
+                                        >
+                                            <option value="">Month</option>
+                                            <option value="01">January</option>
+                                            <option value="02">February</option>
+                                            <option value="03">March</option>
+                                            <option value="04">April</option>
+                                            <option value="05">May</option>
+                                            <option value="06">June</option>
+                                            <option value="07">July</option>
+                                            <option value="08">August</option>
+                                            <option value="09">September</option>
+                                            <option value="10">October</option>
+                                            <option value="11">November</option>
+                                            <option value="12">December</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Year"
+                                            value={profile.workEndYear || ''}
+                                            onChange={(e) => handleChange('workEndYear', e.target.value)}
+                                            style={{ width: '100px' }}
+                                            disabled={profile.isCurrentJob}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="form-group">
+                            <div className="form-group" style={{ marginTop: '1rem', display: 'flex', alignItems: 'center' }}>
+                                <label className="form-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={profile.isCurrentJob || false}
+                                        onChange={(e) => handleChange('isCurrentJob', e.target.checked)}
+                                    />
+                                    <span>I currently work here</span>
+                                </label>
+                            </div>
+                            <div className="form-group" style={{ marginTop: '1rem' }}>
+                                <label className="form-label">Job Description / Responsibilities</label>
+                                <textarea
+                                    className="form-input"
+                                    placeholder="Describe your role, responsibilities, and key achievements..."
+                                    value={profile.jobDescription || ''}
+                                    onChange={(e) => handleChange('jobDescription', e.target.value)}
+                                    rows={4}
+                                />
+                            </div>
+                            <div className="form-group" style={{ marginTop: '1rem' }}>
                                 <label className="form-label">Professional Summary</label>
                                 <textarea
                                     className="form-input"
@@ -282,6 +434,68 @@ export default function ProfileForm() {
                                     onChange={(e) => handleChange('summary', e.target.value)}
                                     rows={4}
                                 />
+                            </div>
+                        </div>
+
+                        {/* Skills */}
+                        <div className="card section animate-fade-in" style={{ animationDelay: '0.25s' }}>
+                            <h3 className="section-title">
+                                <CheckCircle size={20} className="section-icon" />
+                                Skills
+                            </h3>
+                            <div className="grid grid-2">
+                                <div className="form-group">
+                                    <label className="form-label">Technical Skills</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="JavaScript, React, Node.js, Python, SQL, AWS"
+                                        value={profile.skills || ''}
+                                        onChange={(e) => handleChange('skills', e.target.value)}
+                                    />
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                                        Comma-separated list of technical skills
+                                    </small>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Soft Skills</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Leadership, Communication, Problem Solving, Team Work"
+                                        value={profile.softSkills || ''}
+                                        onChange={(e) => handleChange('softSkills', e.target.value)}
+                                    />
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                                        Comma-separated list of soft skills
+                                    </small>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Languages</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="English (Fluent), Hindi (Native), Spanish (Basic)"
+                                        value={profile.languages || ''}
+                                        onChange={(e) => handleChange('languages', e.target.value)}
+                                    />
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                                        Languages with proficiency level
+                                    </small>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Certifications</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="AWS Solutions Architect, Google Cloud Professional"
+                                        value={profile.certifications || ''}
+                                        onChange={(e) => handleChange('certifications', e.target.value)}
+                                    />
+                                    <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>
+                                        Professional certifications
+                                    </small>
+                                </div>
                             </div>
                         </div>
 
@@ -436,16 +650,6 @@ export default function ProfileForm() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Graduation Year</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="2020"
-                                        value={profile.graduationYear || ''}
-                                        onChange={(e) => handleChange('graduationYear', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-group">
                                     <label className="form-label">GPA (optional)</label>
                                     <input
                                         type="text"
@@ -454,6 +658,74 @@ export default function ProfileForm() {
                                         value={profile.gpa || ''}
                                         onChange={(e) => handleChange('gpa', e.target.value)}
                                     />
+                                </div>
+                            </div>
+                            <div className="grid grid-2" style={{ marginTop: '1rem' }}>
+                                <div className="form-group">
+                                    <label className="form-label">Start Date</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <select
+                                            className="form-input"
+                                            value={profile.educationStartMonth || ''}
+                                            onChange={(e) => handleChange('educationStartMonth', e.target.value)}
+                                            style={{ flex: 1 }}
+                                        >
+                                            <option value="">Month</option>
+                                            <option value="01">January</option>
+                                            <option value="02">February</option>
+                                            <option value="03">March</option>
+                                            <option value="04">April</option>
+                                            <option value="05">May</option>
+                                            <option value="06">June</option>
+                                            <option value="07">July</option>
+                                            <option value="08">August</option>
+                                            <option value="09">September</option>
+                                            <option value="10">October</option>
+                                            <option value="11">November</option>
+                                            <option value="12">December</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Year"
+                                            value={profile.educationStartYear || ''}
+                                            onChange={(e) => handleChange('educationStartYear', e.target.value)}
+                                            style={{ width: '100px' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">End Date (Graduation)</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <select
+                                            className="form-input"
+                                            value={profile.educationEndMonth || ''}
+                                            onChange={(e) => handleChange('educationEndMonth', e.target.value)}
+                                            style={{ flex: 1 }}
+                                        >
+                                            <option value="">Month</option>
+                                            <option value="01">January</option>
+                                            <option value="02">February</option>
+                                            <option value="03">March</option>
+                                            <option value="04">April</option>
+                                            <option value="05">May</option>
+                                            <option value="06">June</option>
+                                            <option value="07">July</option>
+                                            <option value="08">August</option>
+                                            <option value="09">September</option>
+                                            <option value="10">October</option>
+                                            <option value="11">November</option>
+                                            <option value="12">December</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Year"
+                                            value={profile.educationEndYear || ''}
+                                            onChange={(e) => handleChange('educationEndYear', e.target.value)}
+                                            style={{ width: '100px' }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -475,6 +747,7 @@ export default function ProfileForm() {
                                 />
                             </div>
                         </div>
+
 
                         {/* Save Button */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--spacing-xl)' }}>

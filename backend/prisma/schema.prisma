@@ -51,15 +51,33 @@ model Profile {
   availableStartDate   String?
 
   // Education
-  degree           String?
-  university       String?
-  graduationYear   String?
-  gpa              String?
-  fieldOfStudy     String?
+  degree               String?
+  university           String?
+  fieldOfStudy         String?
+  gpa                  String?
+  educationStartMonth  String?  // e.g., "09" for September
+  educationStartYear   String?  // e.g., "2018"
+  educationEndMonth    String?  // e.g., "05" for May
+  educationEndYear     String?  // e.g., "2022"
+  graduationYear       String?  // Legacy field, keep for compatibility
 
-  // Experience & Skills
-  yearsOfExperience String?
+  // Work Experience
+  yearsOfExperience    String?
+  // Current/Most Recent Job
+  jobTitle             String?
+  companyName          String?
+  workStartMonth       String?  // e.g., "01" for January
+  workStartYear        String?  // e.g., "2020"
+  workEndMonth         String?  // e.g., "12" for December (leave empty if current)
+  workEndYear          String?  // e.g., "2023" (leave empty if current)
+  isCurrentJob         Boolean  @default(false)
+  jobDescription       String?  // Description of responsibilities
+
+  // Skills & Summary
   skills            String?  // Comma-separated skills
+  softSkills        String?  // Comma-separated soft skills
+  languages         String?  // Languages with proficiency
+  certifications    String?  // Professional certifications
   summary           String?  // Professional summary/objective
 
   // Resume & Cover Letter
@@ -67,6 +85,7 @@ model Profile {
   resumeData        String?  // Base64 encoded resume or URL
   coverLetter       String?  // Default cover letter text
 }
+
 
 model UnknownField {
   id          String   @id @default(uuid())

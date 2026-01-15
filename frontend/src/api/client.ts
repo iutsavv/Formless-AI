@@ -125,18 +125,37 @@ export interface Profile {
     willingToRelocate: boolean;
     salaryExpectation: string | null;
     availableStartDate: string | null;
+    // Education fields
     degree: string | null;
     university: string | null;
-    graduationYear: string | null;
-    gpa: string | null;
     fieldOfStudy: string | null;
+    gpa: string | null;
+    educationStartMonth: string | null;
+    educationStartYear: string | null;
+    educationEndMonth: string | null;
+    educationEndYear: string | null;
+    graduationYear: string | null;
+    // Work Experience fields
     yearsOfExperience: string | null;
+    jobTitle: string | null;
+    companyName: string | null;
+    workStartMonth: string | null;
+    workStartYear: string | null;
+    workEndMonth: string | null;
+    workEndYear: string | null;
+    isCurrentJob: boolean;
+    jobDescription: string | null;
+    // Skills & other
     skills: string | null;
+    softSkills: string | null;
+    languages: string | null;
+    certifications: string | null;
     summary: string | null;
     resumeFileName: string | null;
     resumeData: string | null;
     coverLetter: string | null;
 }
+
 
 export interface UnknownField {
     id: string;
