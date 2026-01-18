@@ -1,6 +1,10 @@
 import { Response } from 'express';
-import pdfParse from 'pdf-parse';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse');
+import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
+
+const prisma = new PrismaClient();
 
 // Parse resume text and extract structured data
 function parseResumeText(text: string): Record<string, string | null> {
@@ -59,7 +63,6 @@ function parseResumeText(text: string): Record<string, string | null> {
     }
 
     // Education section
-    const educationKeywords = ['education', 'academic', 'university', 'college', 'degree', 'bachelor', 'master', 'phd', 'b.s', 'b.a', 'm.s', 'm.a', 'mba'];
     const degreePatterns = [
         /(?:bachelor|b\.?s\.?|b\.?a\.?)\s*(?:of|in)?\s*(?:science|arts|engineering)?/i,
         /(?:master|m\.?s\.?|m\.?a\.?)\s*(?:of|in)?\s*(?:science|arts|engineering|business)?/i,
@@ -67,7 +70,6 @@ function parseResumeText(text: string): Record<string, string | null> {
         /mba/i,
     ];
 
-    const textLower = text.toLowerCase();
     for (const pattern of degreePatterns) {
         const match = text.match(pattern);
         if (match) {
@@ -110,7 +112,6 @@ function parseResumeText(text: string): Record<string, string | null> {
     const skillsSection = text.match(/skills?[:\s]*([\s\S]*?)(?:\n\n|\nexperience|\neducation|\nproject|$)/i);
     if (skillsSection) {
         const skillsText = skillsSection[1];
-        // Extract comma or bullet separated skills
         const skills = skillsText
             .replace(/[•\-\*]/g, ',')
             .split(/[,\n]/)
@@ -210,3 +211,196 @@ export async function parseResume(req: AuthRequest, res: Response): Promise<void
         res.status(500).json({ error: 'Failed to parse resume' });
     }
 }
+
+// Get all resumes for the user
+export async function getResumes(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const profile = await prisma.profile.findUnique({
+            where: { userId },
+            include: { resumes: { orderBy: { createdAt: 'desc' } } },
+        });
+
+        if (!profile) {
+            res.json({ resumes: [] });
+            return;
+        }
+
+        // Don't send fileData in list response to reduce payload
+        const resumes = profile.resumes.map(r => ({
+            id: r.id,
+            fileName: r.fileName,
+            fileSize: r.fileSize,
+            mimeType: r.mimeType,
+            isPrimary: r.isPrimary,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt,
+        }));
+
+        res.json({ resumes });
+    } catch (error) {
+        console.error('Get resumes error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+// Upload and store a resume
+export async function uploadResume(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        if (!req.file) {
+            res.status(400).json({ error: 'No file uploaded' });
+            return;
+        }
+
+        // Get or create profile
+        let profile = await prisma.profile.findUnique({ where: { userId } });
+        if (!profile) {
+            profile = await prisma.profile.create({ data: { userId } });
+        }
+
+        // Check if this should be primary (first resume or explicitly set)
+        const existingResumes = await prisma.resume.count({ where: { profileId: profile.id } });
+        const isPrimary = existingResumes === 0;
+
+        const resume = await prisma.resume.create({
+            data: {
+                profileId: profile.id,
+                fileName: req.file.originalname,
+                fileData: req.file.buffer.toString('base64'),
+                fileSize: req.file.size,
+                mimeType: req.file.mimetype,
+                isPrimary,
+            },
+        });
+
+        res.status(201).json({
+            message: 'Resume uploaded successfully',
+            resume: {
+                id: resume.id,
+                fileName: resume.fileName,
+                fileSize: resume.fileSize,
+                mimeType: resume.mimeType,
+                isPrimary: resume.isPrimary,
+                createdAt: resume.createdAt,
+            },
+        });
+    } catch (error) {
+        console.error('Upload resume error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+// Delete a resume
+export async function deleteResume(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const userId = req.user?.userId;
+        const { id } = req.params;
+
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        // Verify ownership
+        const profile = await prisma.profile.findUnique({ where: { userId } });
+        if (!profile) {
+            res.status(404).json({ error: 'Profile not found' });
+            return;
+        }
+
+        const existing = await prisma.resume.findFirst({
+            where: { id, profileId: profile.id },
+        });
+
+        if (!existing) {
+            res.status(404).json({ error: 'Resume not found' });
+            return;
+        }
+
+        await prisma.resume.delete({ where: { id } });
+
+        // If deleted resume was primary, make the next one primary
+        if (existing.isPrimary) {
+            const nextResume = await prisma.resume.findFirst({
+                where: { profileId: profile.id },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (nextResume) {
+                await prisma.resume.update({
+                    where: { id: nextResume.id },
+                    data: { isPrimary: true },
+                });
+            }
+        }
+
+        res.json({ message: 'Resume deleted successfully' });
+    } catch (error) {
+        console.error('Delete resume error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+// Set a resume as primary
+export async function setPrimaryResume(req: AuthRequest, res: Response): Promise<void> {
+    try {
+        const userId = req.user?.userId;
+        const { id } = req.params;
+
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        // Verify ownership
+        const profile = await prisma.profile.findUnique({ where: { userId } });
+        if (!profile) {
+            res.status(404).json({ error: 'Profile not found' });
+            return;
+        }
+
+        const existing = await prisma.resume.findFirst({
+            where: { id, profileId: profile.id },
+        });
+
+        if (!existing) {
+            res.status(404).json({ error: 'Resume not found' });
+            return;
+        }
+
+        // Unset all other resumes as primary
+        await prisma.resume.updateMany({
+            where: { profileId: profile.id, isPrimary: true },
+            data: { isPrimary: false },
+        });
+
+        // Set this one as primary
+        const resume = await prisma.resume.update({
+            where: { id },
+            data: { isPrimary: true },
+        });
+
+        res.json({
+            message: 'Primary resume updated successfully',
+            resume: {
+                id: resume.id,
+                fileName: resume.fileName,
+                isPrimary: resume.isPrimary,
+            },
+        });
+    } catch (error) {
+        console.error('Set primary resume error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+

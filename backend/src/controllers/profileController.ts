@@ -58,12 +58,22 @@ export async function getProfile(req: AuthRequest, res: Response): Promise<void>
 
         const profile = await prisma.profile.findUnique({
             where: { userId },
+            include: {
+                experiences: { orderBy: { startYear: 'desc' } },
+                educations: { orderBy: { endYear: 'desc' } },
+                resumes: { orderBy: { createdAt: 'desc' } },
+            },
         });
 
         if (!profile) {
             // Create empty profile if doesn't exist
             const newProfile = await prisma.profile.create({
                 data: { userId },
+                include: {
+                    experiences: true,
+                    educations: true,
+                    resumes: true,
+                },
             });
             res.json({ profile: newProfile });
             return;
@@ -120,12 +130,20 @@ export async function getProfileForFill(req: AuthRequest, res: Response): Promis
 
         const profile = await prisma.profile.findUnique({
             where: { userId },
+            include: {
+                educations: { orderBy: { endYear: 'desc' }, take: 1 },
+                experiences: { orderBy: { startYear: 'desc' }, take: 1 },
+            },
         });
 
         if (!profile) {
             res.json({ profile: null, fieldMappings: {} });
             return;
         }
+
+        // Get most recent education and experience for auto-fill
+        const latestEducation = profile.educations[0] || null;
+        const latestExperience = profile.experiences[0] || null;
 
         // Create field mappings for common form field names
         const fieldMappings: Record<string, string | boolean | null> = {
@@ -205,19 +223,19 @@ export async function getProfileForFill(req: AuthRequest, res: Response): Promis
             'startDate': profile.availableStartDate,
             'available_start_date': profile.availableStartDate,
 
-            // Education
-            'degree': profile.degree,
-            'education': profile.degree,
-            'university': profile.university,
-            'school': profile.university,
-            'college': profile.university,
-            'graduation_year': profile.graduationYear,
-            'graduationYear': profile.graduationYear,
-            'grad_year': profile.graduationYear,
-            'gpa': profile.gpa,
-            'field_of_study': profile.fieldOfStudy,
-            'fieldOfStudy': profile.fieldOfStudy,
-            'major': profile.fieldOfStudy,
+            // Education (from latest education record)
+            'degree': latestEducation?.degree || null,
+            'education': latestEducation?.degree || null,
+            'university': latestEducation?.institution || null,
+            'school': latestEducation?.institution || null,
+            'college': latestEducation?.institution || null,
+            'graduation_year': latestEducation?.endYear || null,
+            'graduationYear': latestEducation?.endYear || null,
+            'grad_year': latestEducation?.endYear || null,
+            'gpa': latestEducation?.gpa || null,
+            'field_of_study': latestEducation?.fieldOfStudy || null,
+            'fieldOfStudy': latestEducation?.fieldOfStudy || null,
+            'major': latestEducation?.fieldOfStudy || null,
 
             // Experience
             'years_of_experience': profile.yearsOfExperience,
@@ -237,3 +255,4 @@ export async function getProfileForFill(req: AuthRequest, res: Response): Promis
         res.status(500).json({ error: 'Internal server error' });
     }
 }
+

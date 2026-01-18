@@ -1,4 +1,5 @@
 // Prisma schema for Job Application Auto-Fill Extension
+// Normalized schema with separate tables for Experience, Education, and Resumes
 
 generator client {
   provider = "prisma-client-js"
@@ -50,42 +51,83 @@ model Profile {
   salaryExpectation    String?
   availableStartDate   String?
 
-  // Education
-  degree               String?
-  university           String?
-  fieldOfStudy         String?
-  gpa                  String?
-  educationStartMonth  String?  // e.g., "09" for September
-  educationStartYear   String?  // e.g., "2018"
-  educationEndMonth    String?  // e.g., "05" for May
-  educationEndYear     String?  // e.g., "2022"
-  graduationYear       String?  // Legacy field, keep for compatibility
-
-  // Work Experience
-  yearsOfExperience    String?
-  // Current/Most Recent Job
-  jobTitle             String?
-  companyName          String?
-  workStartMonth       String?  // e.g., "01" for January
-  workStartYear        String?  // e.g., "2020"
-  workEndMonth         String?  // e.g., "12" for December (leave empty if current)
-  workEndYear          String?  // e.g., "2023" (leave empty if current)
-  isCurrentJob         Boolean  @default(false)
-  jobDescription       String?  // Description of responsibilities
-
   // Skills & Summary
-  skills            String?  // Comma-separated skills
+  skills            String?  // Comma-separated technical skills
   softSkills        String?  // Comma-separated soft skills
   languages         String?  // Languages with proficiency
   certifications    String?  // Professional certifications
   summary           String?  // Professional summary/objective
-
-  // Resume & Cover Letter
-  resumeFileName    String?
-  resumeData        String?  // Base64 encoded resume or URL
   coverLetter       String?  // Default cover letter text
+  yearsOfExperience String?  // Total years of experience
+
+  // Relations - one profile can have many experiences, educations, and resumes
+  experiences   Experience[]
+  educations    Education[]
+  resumes       Resume[]
 }
 
+// Work Experience - supports multiple jobs per user
+model Experience {
+  id          String   @id @default(uuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  jobTitle    String
+  companyName String
+  location    String?
+  startMonth  String?  // "01" - "12"
+  startYear   String   // "2020"
+  endMonth    String?  // null if current job
+  endYear     String?  // null if current job
+  isCurrent   Boolean  @default(false)
+  description String?  // Job responsibilities and achievements
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([profileId])
+}
+
+// Education - supports multiple degrees per user
+model Education {
+  id           String   @id @default(uuid())
+  profileId    String
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  degree       String   // Bachelor's, Master's, PhD, MBA, etc.
+  fieldOfStudy String?  // Major/Field of study
+  institution  String   // University/College name
+  location     String?
+  gpa          String?
+  startMonth   String?  // "01" - "12"
+  startYear    String?  // "2018"
+  endMonth     String?  // "05"
+  endYear      String?  // "2022"
+  isCurrent    Boolean  @default(false)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([profileId])
+}
+
+// Resume - supports multiple resumes per user
+model Resume {
+  id          String   @id @default(uuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  fileName    String
+  fileData    String?  // Base64 encoded data or URL
+  fileSize    Int?     // Size in bytes
+  mimeType    String?  // e.g., "application/pdf"
+  isPrimary   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([profileId])
+}
 
 model UnknownField {
   id          String   @id @default(uuid())

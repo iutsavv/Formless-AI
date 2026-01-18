@@ -6,6 +6,8 @@ import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import unknownFieldsRoutes from './routes/unknownFields';
 import resumeRoutes from './routes/resume';
+import experienceRoutes from './routes/experience';
+import educationRoutes from './routes/education';
 
 dotenv.config();
 
@@ -33,6 +35,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/unknown-fields', unknownFieldsRoutes);
 app.use('/api/resume', resumeRoutes);
+app.use('/api/experience', experienceRoutes);
+app.use('/api/education', educationRoutes);
 
 // 404 handler
 app.use((req, res) => {

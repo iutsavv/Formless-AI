@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { parseResume } from '../controllers/resumeController';
+import { parseResume, getResumes, uploadResume, deleteResume, setPrimaryResume } from '../controllers/resumeController';
 import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -31,6 +31,13 @@ const upload = multer({
 // All routes are protected
 router.use(authMiddleware);
 
+// Resume CRUD operations
+router.get('/', getResumes);
+router.post('/upload', upload.single('resume'), uploadResume);
+router.delete('/:id', deleteResume);
+router.put('/:id/primary', setPrimaryResume);
+
+// Legacy parse endpoint (parses resume but doesn't store it)
 router.post('/parse', upload.single('resume'), parseResume);
 
 export default router;
